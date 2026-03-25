@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Moonly Signals</title>
+
+<style>
+body {
+  background: #0f172a;
+  color: white;
+  font-family: Arial;
+  margin: 0;
+  padding: 20px;
+}
+
+h1 {
+  margin-bottom: 10px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filters button {
+  margin-right: 10px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #1e293b;
+  color: white;
+}
+
+.filters button.active {
+  background: #3b82f6;
+}
+
+.container {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 15px;
+}
+
+.card {
+  background: #1e293b;
+  border-radius: 12px;
+  padding: 15px;
+  transition: 0.2s;
+}
+
+.card:hover {
+  transform: scale(1.02);
+}
+
+.symbol {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.buy { color: #22c55e; }
+.sell { color: #ef4444; }
+.wait { color: gray; }
+
+.score {
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.bar {
+  height: 6px;
+  border-radius: 4px;
+  margin-top: 5px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <h1>🚀 Moonly Signals</h1>
+  <div id="count"></div>
+</div>
+
+<div class="filters">
+  <button onclick="setFilter('ALL')" class="active">ALL</button>
+  <button onclick="setFilter('BUY')">BUY</button>
+  <button onclick="setFilter('SELL')">SELL</button>
+</div>
+
+<div class="container" id="signals"></div>
+
+<script>
+const API = "http://127.0.0.1:8000/signals";
+
+let currentFilter = "ALL";
+let allSignals = [];
+
+function setFilter(type) {
+  currentFilter = type;
+
+  document.querySelectorAll("button").forEach(btn => {
+    btn.classList.remove("active");
+  });
+
+  event.target.classList.add("active");
+
+  renderSignals();
+}
+
+function renderSignals() {
+  const container = document.getElementById("signals");
+  const count = document.getElementById("count");
+
+  container.innerHTML = "";
+
+  let filtered = allSignals;
+
+  if (currentFilter !== "ALL") {
+    filtered = allSignals.filter(s => s.signal === currentFilter);
+  }
+
+  // сортировка по score
+  filtered.sort((a, b) => b.score - a.score);
+
+  count.innerText = `Signals: ${filtered.length}`;
+
+  if (filtered.length === 0) {
+    container.innerHTML = "<p>No signals</p>";
+    return;
+  }
+
+  filtered.forEach(s => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const signalClass =
+      s.signal === "BUY" ? "buy" :
+      s.signal === "SELL" ? "sell" : "wait";
+
+    const barColor =
+      s.signal === "BUY" ? "#22c55e" :
+      s.signal === "SELL" ? "#ef4444" : "gray";
+
+    card.innerHTML = `
+      <div class="symbol">${s.symbol}</div>
+      <p>Price: ${s.price}</p>
+      <p>RSI 1H: ${s.rsi_1h}</p>
+      <p>RSI 4H: ${s.rsi_4h}</p>
+      <p>Support: ${s.support}</p>
+      <p>Resistance: ${s.resistance}</p>
+
+      <h3 class="${signalClass}">
+        ${s.signal}
+      </h3>
+
+      <div class="score">
+        Score: ${s.score}
+        <div class="bar" style="width:${s.score}%; background:${barColor}"></div>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+async function loadSignals() {
+  try {
+    const res = await fetch(API);
+    const data = await res.json();
+
+    allSignals = data;
+    renderSignals();
+
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// автообновление
+setInterval(loadSignals, 10000);
+loadSignals();
+</script>
+
+</body>
+</html>
