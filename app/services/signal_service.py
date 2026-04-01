@@ -13,7 +13,6 @@ SYMBOLS = [
 ]
 
 
-# ---------- RSI ----------
 def calculate_rsi(closes, period=14):
     gains = []
     losses = []
@@ -40,32 +39,37 @@ def calculate_rsi(closes, period=14):
     return 100 - (100 / (1 + rs))
 
 
-# ---------- FVG ----------
 def detect_fvg(klines):
     for i in range(2, len(klines)):
         low_prev = float(klines[i - 2][3])
         high_now = float(klines[i][2])
 
         if high_now < low_prev:
-            return 1  # bearish
+            return 1
 
         high_prev = float(klines[i - 2][2])
         low_now = float(klines[i][3])
 
         if low_now > high_prev:
-            return 1  # bullish
+            return 1
 
     return 0
 
 
-# ---------- API ----------
 async def fetch_klines(session, symbol, interval):
     url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit=100"
     async with session.get(url, timeout=10) as response:
         return await response.json()
 
 
-# ---------- CORE ----------
+def generate_ai_analysis(signal):
+    if signal["signal"] == "BUY":
+        return "Рынок перепродан, есть потенциал роста."
+    elif signal["signal"] == "SELL":
+        return "Рынок перекуплен, возможна коррекция."
+    return "Нет сигнала."
+
+
 async def process_symbol(session, symbol):
     try:
         klines_1h = await fetch_klines(session, symbol, "1h")
@@ -86,7 +90,6 @@ async def process_symbol(session, symbol):
         signal = "HOLD"
         score = 0
 
-        # ---------- ЛОГИКА 10/10 ----------
         if rsi_1h < 30 and rsi_4h < 40 and fvg == 1:
             signal = "BUY"
             score = 90
@@ -95,7 +98,6 @@ async def process_symbol(session, symbol):
             signal = "SELL"
             score = 90
 
-        # фильтр слабых
         if signal == "HOLD":
             return None
 
@@ -114,7 +116,6 @@ async def process_symbol(session, symbol):
         return None
 
 
-# ---------- GENERATE ----------
 async def generate_signals():
     async with aiohttp.ClientSession() as session:
         tasks = [process_symbol(session, s) for s in SYMBOLS]
@@ -122,18 +123,14 @@ async def generate_signals():
 
         signals = [r for r in results if r]
 
-        # сортировка по силе
         signals.sort(key=lambda x: x["score"], reverse=True)
 
-        # оставляем топ 3
         return signals[:3]
 
 
-# ---------- MAIN ----------
 async def get_signals():
     now = time.time()
 
-    # кеш 15 сек
     if CACHE["data"] and now - CACHE["timestamp"] < 15:
         return CACHE["data"]
 
