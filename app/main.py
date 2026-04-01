@@ -1,77 +1,30 @@
-from fastapi import FastAPI, Query
-from app.services.signal_service import get_signals
+from fastapi import FastAPI
 
-app = FastAPI(title="Moonly API")
+app = FastAPI()
 
 
 @app.get("/")
-async def root():
-    return {"status": "ok"}
+def root():
+    return {"status": "WORKING"}
 
 
 @app.get("/signals")
-async def signals(plan: str = Query("free")):
-    data = await get_signals()
-
-    # 🟢 FREE
-    if plan == "free":
-        symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
-
-        result = [s for s in data if s["symbol"] in symbols]
-
-        # всегда показываем хоть что-то
-        return sorted(result, key=lambda x: x["score"], reverse=True)[:2]
-
-    # 🟡 PRO
-    elif plan == "pro":
-        symbols = [
-            "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-            "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT"
-        ]
-
-        result = [s for s in data if s["symbol"] in symbols]
-
-        strong = [s for s in result if s["score"] >= 70]
-
-        if strong:
-            return strong[:6]
-
-        return sorted(result, key=lambda x: x["score"], reverse=True)[:6]
-
-    # 🔴 DELUXE
-    elif plan == "deluxe":
-        symbols = [
-            "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-            "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
-            "TRXUSDT", "LTCUSDT", "BCHUSDT", "APTUSDT", "NEARUSDT",
-            "ARBUSDT", "OPUSDT", "SUIUSDT", "TONUSDT", "MATICUSDT"
-        ]
-
-        result = [s for s in data if s["symbol"] in symbols]
-
-        strong = [s for s in result if s["score"] >= 80 and s["signal"] != "HOLD"]
-
-        if strong:
-            result = strong
-        else:
-            result = sorted(result, key=lambda x: x["score"], reverse=True)[:5]
-
-        for s in result:
-            s["analysis"] = generate_analysis_text(s)
-
-        return result
-
-    return data
-
-
-@app.get("/signals/{plan}")
-async def signals_path(plan: str):
-    return await signals(plan)
-
-
-def generate_analysis_text(signal):
-    if signal["signal"] == "BUY":
-        return f"Bullish momentum. Entry {signal['entry']} with upside potential."
-    elif signal["signal"] == "SELL":
-        return f"Bearish setup. Possible drop from {signal['entry']}."
-    return "Market unclear."
+def signals():
+    return [
+        {
+            "symbol": "BTCUSDT",
+            "signal": "BUY",
+            "entry": 65000,
+            "tp": 67000,
+            "sl": 63000,
+            "winrate": 72
+        },
+        {
+            "symbol": "ETHUSDT",
+            "signal": "SELL",
+            "entry": 3200,
+            "tp": 3000,
+            "sl": 3350,
+            "winrate": 68
+        }
+    ]
