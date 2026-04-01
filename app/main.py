@@ -2,8 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.signal_service import get_mock_signals
 
-app = FastAPI(title="Moonly API")
+app = FastAPI()
 
+# чтобы фронт работал
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,8 +15,8 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"message": "Moonly backend is running"}
+    return {"status": "ok"}
 
-@app.get("/signals")
-def get_signals():
+@app.get("/api/signals")
+def signals():
     return get_mock_signals()

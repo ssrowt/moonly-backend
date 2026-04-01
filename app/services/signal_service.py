@@ -7,6 +7,7 @@ CACHE = {
     "timestamp": 0
 }
 
+# получаем топ пары с Binance
 async def get_top_symbols(session, limit=10):
     url = "https://api.binance.com/api/v3/ticker/24hr"
 
@@ -31,6 +32,7 @@ async def get_top_symbols(session, limit=10):
     return symbols[:limit]
 
 
+# генерируем сигналы
 async def generate_signals():
     async with aiohttp.ClientSession() as session:
         symbols = await get_top_symbols(session, 10)
@@ -41,22 +43,23 @@ async def generate_signals():
             signals.append({
                 "id": i,
                 "symbol": symbol,
-                "price": 0,
-                "support": 0,
-                "resistance": 0,
-                "rsi_1h": 50,
-                "rsi_4h": 50,
+                "price": round(100 + i * 2, 2),
+                "support": round(95 + i * 2, 2),
+                "resistance": round(105 + i * 2, 2),
+                "rsi_1h": 30 + i,
+                "rsi_4h": 40 + i,
                 "signal": "BUY" if i % 2 == 0 else "SELL",
-                "score": 70 + i
+                "score": 80 + i
             })
 
         return signals
 
 
+# кешируем (чтобы не долбить API)
 def get_mock_signals():
     now = time.time()
 
-    if now - CACHE["timestamp"] < 10:
+    if CACHE["data"] and now - CACHE["timestamp"] < 10:
         return CACHE["data"]
 
     data = asyncio.run(generate_signals())
