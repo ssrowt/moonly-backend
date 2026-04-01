@@ -1,4 +1,3 @@
-print("REAL VERSION 123")
 import aiohttp
 import asyncio
 import time
@@ -22,6 +21,9 @@ def calculate_rsi(closes, period=14):
             gains.append(0)
             losses.append(abs(diff))
 
+    if len(gains) < period:
+        return 50
+
     avg_gain = sum(gains[-period:]) / period
     avg_loss = sum(losses[-period:]) / period
 
@@ -37,62 +39,85 @@ def detect_fvg(candles):
     zones = []
 
     for i in range(2, len(candles)):
-        prev = candles[i - 2]
-        curr = candles[i]
+        try:
+            prev = candles[i - 2]
+            curr = candles[i]
 
-        high_prev = float(prev[2])
-        low_prev = float(prev[3])
-        high_curr = float(curr[2])
-        low_curr = float(curr[3])
+            high_prev = float(prev[2])
+            low_prev = float(prev[3])
+            high_curr = float(curr[2])
+            low_curr = float(curr[3])
 
-        # bullish gap
-        if low_curr > high_prev:
-            zones.append("bullish")
+            if low_curr > high_prev:
+                zones.append("bullish")
 
-        # bearish gap
-        if high_curr < low_prev:
-            zones.append("bearish")
+            if high_curr < low_prev:
+                zones.append("bearish")
+
+        except:
+            continue
 
     return zones
 
 
-# ---------- Binance ----------
+# ---------- API ----------
 async def get_top_symbols(session, limit=10):
-    url = "https://api.binance.com/api/v3/ticker/24hr"
+    try:
+        url = "https://api.binance.com/api/v3/ticker/24hr"
 
-    async with session.get(url) as response:
-        data = await response.json()
+        async with session.get(url) as response:
+            data = await response.json()
 
-    sorted_data = sorted(
-        data,
-        key=lambda x: float(x.get("quoteVolume", 0)),
-        reverse=True
-    )
+        sorted_data = sorted(
+            data,
+            key=lambda x: float(x.get("quoteVolume", 0)),
+            reverse=True
+        )
 
-    symbols = [
-        x["symbol"]
-        for x in sorted_data
-        if x["symbol"].endswith("USDT")
-    ]
+        symbols = [
+            x["symbol"]
+            for x in sorted_data
+            if x["symbol"].endswith("USDT")
+        ]
 
-    return symbols[:limit]
+        return symbols[:limit]
+
+    except Exception as e:
+        print("TOP SYMBOLS ERROR:", e)
+        return ["BTCUSDT", "ETHUSDT"]
 
 
 async def get_klines(session, symbol, interval):
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit=100"
+    try:
+        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit=100"
 
-    async with session.get(url) as response:
-        return await response.json()
+        async with session.get(url) as response:
+            data = await response.json()
+
+        if isinstance(data, dict):
+            return []
+
+        return data
+
+    except Exception as e:
+        print("KLINES ERROR:", symbol, e)
+        return []
 
 
-# ---------- LOGIC ----------
+# ---------- SYMBOL ----------
 async def process_symbol(session, symbol, i):
     try:
         klines_1h = await get_klines(session, symbol, "1h")
         klines_4h = await get_klines(session, symbol, "4h")
 
+        if not klines_1h or not klines_4h:
+            return None
+
         closes_1h = [float(k[4]) for k in klines_1h]
         closes_4h = [float(k[4]) for k in klines_4h]
+
+        if len(closes_1h) < 20 or len(closes_4h) < 20:
+            return None
 
         rsi_1h = calculate_rsi(closes_1h)
         rsi_4h = calculate_rsi(closes_4h)
@@ -104,7 +129,6 @@ async def process_symbol(session, symbol, i):
         signal = "WAIT"
         score = 50
 
-        # RSI логика
         if rsi_1h < 35 and rsi_4h < 40:
             signal = "BUY"
             score = 85
@@ -113,7 +137,6 @@ async def process_symbol(session, symbol, i):
             signal = "SELL"
             score = 85
 
-        # FVG усиливает сигнал
         if fvg:
             score += 5
 
@@ -128,28 +151,41 @@ async def process_symbol(session, symbol, i):
             "fvg": len(fvg)
         }
 
-    except Exception:
+    except Exception as e:
+        print("SYMBOL ERROR:", symbol, e)
         return None
 
 
-# ---------- GENERATOR ----------
+# ---------- GENERATE ----------
 async def generate_signals():
-    async with aiohttp.ClientSession() as session:
-        symbols = await get_top_symbols(session, 10)
+    try:
+        async with aiohttp.ClientSession() as session:
+            symbols = await get_top_symbols(session, 10)
 
-        tasks = [
-            process_symbol(session, symbol, i)
-            for i, symbol in enumerate(symbols)
-        ]
+            tasks = [
+                process_symbol(session, symbol, i)
+                for i, symbol in enumerate(symbols)
+            ]
 
-        results = await asyncio.gather(*tasks)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        signals = [r for r in results if r is not None]
+            signals = []
 
-        if not signals:
-            return generate_test_signals()
+            for r in results:
+                if isinstance(r, Exception):
+                    print("TASK ERROR:", r)
+                    continue
+                if r:
+                    signals.append(r)
 
-        return signals
+            if not signals:
+                return generate_test_signals()
+
+            return signals
+
+    except Exception as e:
+        print("FATAL ERROR:", e)
+        return generate_test_signals()
 
 
 # ---------- FALLBACK ----------
