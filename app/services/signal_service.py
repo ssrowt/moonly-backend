@@ -192,16 +192,25 @@ async def generate_signals():
 def generate_test_signals():
     return [
         {
-            "id": i,
-            "symbol": f"TEST{i}",
-            "price": 100 + i,
-            "rsi_1h": 30,
-            "rsi_4h": 40,
-            "signal": "BUY" if i % 2 == 0 else "SELL",
-            "score": 90,
+            "id": 0,
+            "symbol": "BTCUSDT",
+            "price": 65000,
+            "rsi_1h": 35,
+            "rsi_4h": 42,
+            "signal": "BUY",
+            "score": 80,
             "fvg": 1
+        },
+        {
+            "id": 1,
+            "symbol": "ETHUSDT",
+            "price": 3200,
+            "rsi_1h": 60,
+            "rsi_4h": 55,
+            "signal": "SELL",
+            "score": 78,
+            "fvg": 0
         }
-        for i in range(5)
     ]
 
 
