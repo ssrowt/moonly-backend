@@ -1,11 +1,7 @@
 import requests
 import time
 
-CACHE = {
-    "data": [],
-    "timestamp": 0
-}
-
+CACHE = {"data": [], "timestamp": 0}
 CACHE_TTL = 60
 
 SYMBOLS = [
@@ -37,29 +33,8 @@ def calculate_rsi(closes, period=14):
     return 100 - (100 / (1 + rs))
 
 
-def detect_fvg(highs, lows):
-    if len(highs) < 3:
-        return 0
-
-    if lows[-1] > highs[-3]:
-        return 1
-    elif highs[-1] < lows[-3]:
-        return -1
-
-    return 0
-
-
-def calculate_score(rsi, fvg):
-    score = 50
-
-    # RSI вклад
-    score += int(abs(50 - rsi))
-
-    # FVG бонус
-    if fvg != 0:
-        score += 15
-
-    return min(score, 95)
+def calculate_score(rsi):
+    return int(100 - abs(50 - rsi))
 
 
 def estimate_winrate(score):
@@ -88,20 +63,17 @@ async def get_signals():
                 continue
 
             closes = [float(x[4]) for x in data if len(x) > 4]
-            highs = [float(x[2]) for x in data if len(x) > 2]
-            lows = [float(x[3]) for x in data if len(x) > 3]
 
             if len(closes) < 30:
                 continue
 
             price = closes[-1]
             rsi = calculate_rsi(closes)
-            fvg = detect_fvg(highs, lows)
 
-            # 🔥 ВСЕГДА даем сигнал
-            if rsi < 40:
+            # 🔥 ВСЕГДА есть сигнал
+            if rsi < 45:
                 signal = "BUY"
-            elif rsi > 60:
+            elif rsi > 55:
                 signal = "SELL"
             else:
                 signal = "HOLD"
@@ -118,7 +90,7 @@ async def get_signals():
                 sl = price * 0.99
                 tp = price * 1.01
 
-            score = calculate_score(rsi, fvg)
+            score = calculate_score(rsi)
             winrate = estimate_winrate(score)
 
             results.append({
@@ -131,14 +103,12 @@ async def get_signals():
                 "tp": round(tp, 2),
                 "score": score,
                 "winrate": winrate,
-                "fvg": fvg,
                 "is_fresh": True
             })
 
         except Exception as e:
             print("ERROR:", symbol, e)
 
-    # 🔥 сортируем
     results = sorted(results, key=lambda x: x["score"], reverse=True)
 
     CACHE["data"] = results
