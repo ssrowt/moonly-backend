@@ -10,7 +10,9 @@ CACHE_TTL = 60
 
 SYMBOLS = [
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT"
+    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
+    "TRXUSDT", "LTCUSDT", "BCHUSDT", "APTUSDT", "NEARUSDT",
+    "ARBUSDT", "OPUSDT", "SUIUSDT", "TONUSDT", "MATICUSDT"
 ]
 
 
@@ -40,6 +42,10 @@ def calculate_rsi(closes, period=14):
     return 100 - (100 / (1 + rs))
 
 
+def estimate_winrate(rsi):
+    return min(50 + abs(50 - rsi), 90)
+
+
 async def get_signals():
     now = time.time()
 
@@ -51,11 +57,22 @@ async def get_signals():
     for symbol in SYMBOLS:
         try:
             url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=50"
-            data = requests.get(url, timeout=5).json()
+            response = requests.get(url, timeout=5)
 
-            closes = [float(x[4]) for x in data]
-            highs = [float(x[2]) for x in data]
-            lows = [float(x[3]) for x in data]
+            if response.status_code != 200:
+                print("BAD RESPONSE:", symbol)
+                continue
+
+            data = response.json()
+
+            if not isinstance(data, list) or len(data) == 0:
+                print("BAD DATA:", symbol, data)
+                continue
+
+            closes = [float(x[4]) for x in data if len(x) > 4]
+
+            if len(closes) < 20:
+                continue
 
             price = closes[-1]
             rsi = calculate_rsi(closes)
@@ -68,11 +85,19 @@ async def get_signals():
                 signal = "SELL"
 
             entry = price
-            sl = price * 0.98 if signal == "BUY" else price * 1.02
-            tp = price * 1.04 if signal == "BUY" else price * 0.96
+
+            if signal == "BUY":
+                sl = price * 0.98
+                tp = price * 1.04
+            elif signal == "SELL":
+                sl = price * 1.02
+                tp = price * 0.96
+            else:
+                sl = price
+                tp = price
 
             score = int(100 - abs(50 - rsi))
-            winrate = min(50 + abs(50 - rsi), 90)
+            winrate = estimate_winrate(rsi)
 
             results.append({
                 "symbol": symbol,

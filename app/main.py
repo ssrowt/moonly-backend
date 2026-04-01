@@ -22,36 +22,12 @@ async def signals(plan: str = Query("free")):
     elif plan == "pro":
         symbols = [
             "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-            "ADAUSDT", "DOGEUSDT", "TONUSDT", "AVAXUSDT", "LINKUSDT"
+            "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT"
         ]
         return [s for s in data if s["symbol"] in symbols][:6]
 
-    # 🔴 DELUXE — топ 20 + только сильные сигналы
+    # 🔴 DELUXE — топ 20 + топ сигналы
     elif plan == "deluxe":
         symbols = [
             "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-            "ADAUSDT", "DOGEUSDT", "TONUSDT", "AVAXUSDT", "LINKUSDT",
-            "MATICUSDT", "DOTUSDT", "TRXUSDT", "LTCUSDT", "BCHUSDT",
-            "APTUSDT", "NEARUSDT", "ARBUSDT", "OPUSDT", "SUIUSDT"
-        ]
-
-        # 🔥 фильтр ТОП сигналов
-        result = [
-            s for s in data
-            if s["symbol"] in symbols and s["score"] >= 80 and s["signal"] != "HOLD"
-        ]
-
-        for s in result:
-            s["analysis"] = generate_analysis_text(s)
-
-        return result
-
-    return data
-
-
-def generate_analysis_text(signal):
-    if signal["signal"] == "BUY":
-        return f"Bullish momentum. Entry near {signal['entry']} with upside potential."
-    elif signal["signal"] == "SELL":
-        return f"Bearish setup. Possible drop from {signal['entry']}."
-    return "Market unclear."
+            "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT
