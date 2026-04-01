@@ -1,5 +1,5 @@
-from fastapi import FastAPI
-from app.services.signal_service import get_signals, generate_ai_analysis
+from fastapi import FastAPI, Query
+from app.services.signal_service import get_signals
 
 app = FastAPI()
 
@@ -9,25 +9,18 @@ async def root():
     return {"status": "ok"}
 
 
-# FREE (1 сигнал)
-@app.get("/signals/free")
-async def free():
-    data = await get_signals()
-    return data[:1]
-
-
-# PRO (все сигналы)
-@app.get("/signals/pro")
-async def pro():
-    return await get_signals()
-
-
-# DELUXE (с AI)
-@app.get("/signals/deluxe")
-async def deluxe():
+@app.get("/signals")
+async def signals(plan: str = Query("free")):
     data = await get_signals()
 
-    for d in data:
-        d["analysis"] = generate_ai_analysis(d)
+    # 💰 PAYWALL ЛОГИКА
+    if plan == "free":
+        return data[:2]
+
+    elif plan == "pro":
+        return data[:10]
+
+    elif plan == "deluxe":
+        return data  # + потом добавим AI
 
     return data

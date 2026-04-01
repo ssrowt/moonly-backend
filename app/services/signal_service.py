@@ -1,161 +1,101 @@
-import aiohttp
-import asyncio
+import requests
+import pandas as pd
 import time
 
 CACHE = {
-    "data": None,
+    "data": [],
     "timestamp": 0
 }
 
-SYMBOLS = [
-    "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT",
-    "BNBUSDT", "ADAUSDT", "DOGEUSDT"
-]
 
+# 📊 RSI
+def calculate_rsi(series, period=14):
+    delta = series.diff()
 
-def calculate_rsi(closes, period=14):
-    gains = []
-    losses = []
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
 
-    for i in range(1, len(closes)):
-        diff = closes[i] - closes[i - 1]
-        if diff >= 0:
-            gains.append(diff)
-            losses.append(0)
-        else:
-            gains.append(0)
-            losses.append(abs(diff))
-
-    if len(gains) < period:
-        return 50
-
-    avg_gain = sum(gains[-period:]) / period
-    avg_loss = sum(losses[-period:]) / period
-
-    if avg_loss == 0:
-        return 100
-
-    rs = avg_gain / avg_loss
+    rs = gain / loss
     return 100 - (100 / (1 + rs))
 
 
-def detect_fvg(klines):
-    for i in range(2, len(klines)):
-        low_prev = float(klines[i - 2][3])
-        high_now = float(klines[i][2])
+# ⚡ FVG (упрощенный)
+def detect_fvg(df):
+    fvg_list = []
 
-        if high_now < low_prev:
-            return 1
+    for i in range(2, len(df)):
+        if df["low"][i] > df["high"][i - 2]:
+            fvg_list.append(1)
+        else:
+            fvg_list.append(0)
 
-        high_prev = float(klines[i - 2][2])
-        low_now = float(klines[i][3])
-
-        if low_now > high_prev:
-            return 1
-
-    return 0
+    return [0, 0] + fvg_list
 
 
-async def fetch_klines(session, symbol, interval):
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit=100"
-    async with session.get(url, timeout=10) as response:
-        return await response.json()
-
-
-def generate_ai_analysis(signal):
-    if signal["signal"] == "BUY":
-        return "Рынок перепродан, есть потенциал роста."
-    elif signal["signal"] == "SELL":
-        return "Рынок перекуплен, возможна коррекция."
-    return "Нет сигнала."
-
-
-async def process_symbol(session, symbol):
-    try:
-        klines_1h = await fetch_klines(session, symbol, "1h")
-        klines_4h = await fetch_klines(session, symbol, "4h")
-
-        if not klines_1h or not klines_4h:
-            return None
-
-        closes_1h = [float(k[4]) for k in klines_1h]
-        closes_4h = [float(k[4]) for k in klines_4h]
-
-        rsi_1h = calculate_rsi(closes_1h)
-        rsi_4h = calculate_rsi(closes_4h)
-
-        fvg = detect_fvg(klines_1h)
-        price = closes_1h[-1]
-
-        signal = "HOLD"
-        score = 0
-
-        if rsi_1h < 30 and rsi_4h < 40 and fvg == 1:
-            signal = "BUY"
-            score = 90
-
-        elif rsi_1h > 70 and rsi_4h > 60 and fvg == 1:
-            signal = "SELL"
-            score = 90
-
-        if signal == "HOLD":
-            return None
-
-        return {
-            "symbol": symbol,
-            "price": round(price, 4),
-            "rsi_1h": round(rsi_1h, 2),
-            "rsi_4h": round(rsi_4h, 2),
-            "signal": signal,
-            "score": score,
-            "fvg": fvg
-        }
-
-    except Exception as e:
-        print("ERROR:", symbol, e)
-        return None
-
-
-async def generate_signals():
-    async with aiohttp.ClientSession() as session:
-        tasks = [process_symbol(session, s) for s in SYMBOLS]
-        results = await asyncio.gather(*tasks)
-
-        signals = [r for r in results if r]
-
-        signals.sort(key=lambda x: x["score"], reverse=True)
-
-        return signals[:3]
-
-
+# 🚀 ОСНОВНАЯ ФУНКЦИЯ
 async def get_signals():
     now = time.time()
 
-    if CACHE["data"] and now - CACHE["timestamp"] < 15:
+    # ⚡ КЕШ
+    if now - CACHE["timestamp"] < 120:
         return CACHE["data"]
 
+    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"]
+
+    signals = []
+
     try:
-        data = await generate_signals()
+        for symbol in symbols:
+            url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1h&limit=100"
+            data = requests.get(url).json()
 
-        if not data:
-            raise Exception("No signals")
+            df = pd.DataFrame(data)
+            df.columns = [
+                "time", "open", "high", "low", "close", "volume",
+                "_", "_", "_", "_", "_", "_"
+            ]
 
-        CACHE["data"] = data
+            df["close"] = df["close"].astype(float)
+            df["high"] = df["high"].astype(float)
+            df["low"] = df["low"].astype(float)
+
+            # RSI
+            df["rsi"] = calculate_rsi(df["close"])
+
+            # FVG
+            df["fvg"] = detect_fvg(df)
+
+            last = df.iloc[-1]
+
+            signal = "HOLD"
+
+            if last["rsi"] < 35 and last["fvg"] == 1:
+                signal = "BUY"
+            elif last["rsi"] > 65:
+                signal = "SELL"
+
+            signals.append({
+                "symbol": symbol,
+                "price": round(last["close"], 2),
+                "rsi": round(last["rsi"], 2),
+                "signal": signal,
+                "score": int(100 - abs(50 - last["rsi"])),
+                "fvg": int(last["fvg"])
+            })
+
+        # сортировка
+        signals = sorted(signals, key=lambda x: x["score"], reverse=True)
+
+        # кеш
+        CACHE["data"] = signals
         CACHE["timestamp"] = now
 
-        return data
+        return signals
 
     except Exception as e:
-        print("FALLBACK:", e)
+        print("ERROR:", e)
 
-        return [
-            {
-                "symbol": "BTCUSDT",
-                "price": 65000,
-                "rsi_1h": 50,
-                "rsi_4h": 50,
-                "signal": "HOLD",
-                "score": 0,
-                "fvg": 0
-            }
-        ]
+        if CACHE["data"]:
+            return CACHE["data"]
+
+        return []
