@@ -16,19 +16,13 @@ SYMBOLS = [
 ]
 
 
-# 📊 RSI
 def calculate_rsi(closes, period=14):
-    gains = []
-    losses = []
+    gains, losses = [], []
 
     for i in range(1, len(closes)):
         diff = closes[i] - closes[i - 1]
-        if diff > 0:
-            gains.append(diff)
-            losses.append(0)
-        else:
-            gains.append(0)
-            losses.append(abs(diff))
+        gains.append(max(diff, 0))
+        losses.append(abs(min(diff, 0)))
 
     if len(gains) < period:
         return 50
@@ -43,40 +37,35 @@ def calculate_rsi(closes, period=14):
     return 100 - (100 / (1 + rs))
 
 
-# 🎯 FVG (упрощённый)
 def detect_fvg(highs, lows):
     if len(highs) < 3:
         return 0
 
     if lows[-1] > highs[-3]:
-        return 1   # bullish imbalance
+        return 1
     elif highs[-1] < lows[-3]:
-        return -1  # bearish imbalance
+        return -1
 
     return 0
 
 
-# 🧠 SCORE (качество сигнала)
 def calculate_score(rsi, fvg):
     score = 50
 
-    if rsi < 35:
-        score += 20
-    elif rsi > 65:
-        score += 20
+    # RSI вклад
+    score += int(abs(50 - rsi))
 
+    # FVG бонус
     if fvg != 0:
-        score += 20
+        score += 15
 
     return min(score, 95)
 
 
-# 📈 Winrate (оценка)
 def estimate_winrate(score):
     return min(50 + (score - 50), 90)
 
 
-# 🚀 ОСНОВА
 async def get_signals():
     now = time.time()
 
@@ -109,25 +98,25 @@ async def get_signals():
             rsi = calculate_rsi(closes)
             fvg = detect_fvg(highs, lows)
 
-            signal = "HOLD"
-
-            if rsi < 35 and fvg == 1:
+            # 🔥 ВСЕГДА даем сигнал
+            if rsi < 40:
                 signal = "BUY"
-            elif rsi > 65 and fvg == -1:
+            elif rsi > 60:
                 signal = "SELL"
+            else:
+                signal = "HOLD"
 
-            # 📊 уровни
             entry = price
 
             if signal == "BUY":
                 sl = price * 0.98
-                tp = price * 1.05
+                tp = price * 1.04
             elif signal == "SELL":
                 sl = price * 1.02
-                tp = price * 0.95
+                tp = price * 0.96
             else:
-                sl = price
-                tp = price
+                sl = price * 0.99
+                tp = price * 1.01
 
             score = calculate_score(rsi, fvg)
             winrate = estimate_winrate(score)
@@ -149,7 +138,7 @@ async def get_signals():
         except Exception as e:
             print("ERROR:", symbol, e)
 
-    # 🔥 сортировка по качеству
+    # 🔥 сортируем
     results = sorted(results, key=lambda x: x["score"], reverse=True)
 
     CACHE["data"] = results
