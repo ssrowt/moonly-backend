@@ -13,47 +13,30 @@ def root():
 async def signals(plan: str = Query("free")):
     data = await get_signals()
 
-    # 🔥 делим по силе
     strong = [s for s in data if s["score"] >= 70]
     medium = [s for s in data if 50 <= s["score"] < 70]
     weak = [s for s in data if s["score"] < 50]
 
-    # 🟢 FREE — слабые + немного средних
+    # FREE
     if plan == "free":
-        result = weak + medium[:2]
+        result = (weak + medium)[:5]
 
-        if not result:
-            result = data[:3]
-
-        return result[:3]
-
-    # 🟡 PRO — средние + немного сильных
+    # PRO
     elif plan == "pro":
-        result = medium + strong[:2]
+        result = (medium + strong)[:10]
 
-        if not result:
-            result = data[:5]
-
-        return result[:5]
-
-    # 🔴 DELUXE — только сильные
+    # DELUXE
     elif plan == "deluxe":
-        result = strong
-
-        if not result:
-            result = data[:5]
+        result = strong[:20]
 
         for s in result:
-            s["analysis"] = generate_analysis(s)
+            s["analysis"] = f"{s['signal']} setup. Entry {s['entry']}, TP {s['tp']}, SL {s['sl']}"
 
-        return result[:5]
+    else:
+        result = data[:5]
 
-    return data
+    # ❗ ГАРАНТИЯ: не будет []
+    if not result:
+        result = data[:5]
 
-
-def generate_analysis(s):
-    if s["signal"] == "BUY":
-        return f"Strong bullish setup. Entry {s['entry']}."
-    elif s["signal"] == "SELL":
-        return f"Strong bearish setup. Entry {s['entry']}."
-    return "Weak market."
+    return result
