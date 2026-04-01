@@ -15,44 +15,41 @@ async def signals(plan: str = Query("free")):
 
     # 🟢 FREE
     if plan == "free":
-        symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
-        result = [s for s in data if s["symbol"] in symbols]
-        return sorted(result, key=lambda x: x["score"], reverse=True)[:2]
+        return data[:3]
 
     # 🟡 PRO
     elif plan == "pro":
-        symbols = [
-            "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-            "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT"
+        pro = [
+            s for s in data
+            if s["signal"] != "HOLD" and s["score"] >= 60
         ]
-        result = [s for s in data if s["symbol"] in symbols]
-        return sorted(result, key=lambda x: x["score"], reverse=True)[:6]
+
+        if not pro:
+            pro = data[:5]
+
+        return pro[:5]
 
     # 🔴 DELUXE
     elif plan == "deluxe":
-        symbols = [
-            "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-            "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
-            "TRXUSDT", "LTCUSDT", "BCHUSDT", "APTUSDT", "NEARUSDT",
-            "ARBUSDT", "OPUSDT", "SUIUSDT", "TONUSDT", "MATICUSDT"
+        deluxe = [
+            s for s in data
+            if s["signal"] != "HOLD" and s["score"] >= 75
         ]
 
-        result = [s for s in data if s["symbol"] in symbols]
+        if not deluxe:
+            deluxe = data[:5]
 
-        # 🔥 всегда есть сигналы
-        result = sorted(result, key=lambda x: x["score"], reverse=True)[:8]
-
-        for s in result:
+        for s in deluxe:
             s["analysis"] = generate_analysis(s)
 
-        return result
+        return deluxe[:5]
 
     return data
 
 
 def generate_analysis(s):
     if s["signal"] == "BUY":
-        return f"Market looks bullish. Entry {s['entry']} with upside potential."
+        return f"Strong bullish setup. Entry {s['entry']}."
     elif s["signal"] == "SELL":
-        return f"Bearish pressure detected. Possible drop from {s['entry']}."
-    return "Weak market structure, low confidence."
+        return f"Strong bearish pressure. Entry {s['entry']}."
+    return "Weak setup."
