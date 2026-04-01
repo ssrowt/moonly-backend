@@ -13,21 +13,65 @@ async def root():
 async def signals(plan: str = Query("free")):
     data = await get_signals()
 
-    # 🟢 FREE — топ 5
+    # 🟢 FREE
     if plan == "free":
         symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
-        return [s for s in data if s["symbol"] in symbols][:2]
 
-    # 🟡 PRO — топ 10
+        result = [s for s in data if s["symbol"] in symbols]
+
+        # всегда показываем хоть что-то
+        return sorted(result, key=lambda x: x["score"], reverse=True)[:2]
+
+    # 🟡 PRO
     elif plan == "pro":
         symbols = [
             "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
             "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT"
         ]
-        return [s for s in data if s["symbol"] in symbols][:6]
 
-    # 🔴 DELUXE — топ 20 + топ сигналы
+        result = [s for s in data if s["symbol"] in symbols]
+
+        strong = [s for s in result if s["score"] >= 70]
+
+        if strong:
+            return strong[:6]
+
+        return sorted(result, key=lambda x: x["score"], reverse=True)[:6]
+
+    # 🔴 DELUXE
     elif plan == "deluxe":
         symbols = [
             "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-            "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT
+            "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
+            "TRXUSDT", "LTCUSDT", "BCHUSDT", "APTUSDT", "NEARUSDT",
+            "ARBUSDT", "OPUSDT", "SUIUSDT", "TONUSDT", "MATICUSDT"
+        ]
+
+        result = [s for s in data if s["symbol"] in symbols]
+
+        strong = [s for s in result if s["score"] >= 80 and s["signal"] != "HOLD"]
+
+        if strong:
+            result = strong
+        else:
+            result = sorted(result, key=lambda x: x["score"], reverse=True)[:5]
+
+        for s in result:
+            s["analysis"] = generate_analysis_text(s)
+
+        return result
+
+    return data
+
+
+@app.get("/signals/{plan}")
+async def signals_path(plan: str):
+    return await signals(plan)
+
+
+def generate_analysis_text(signal):
+    if signal["signal"] == "BUY":
+        return f"Bullish momentum. Entry {signal['entry']} with upside potential."
+    elif signal["signal"] == "SELL":
+        return f"Bearish setup. Possible drop from {signal['entry']}."
+    return "Market unclear."
