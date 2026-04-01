@@ -1,10 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.services.signal_service import get_mock_signals
+from app.services.signal_service import get_signals
 
 app = FastAPI()
 
-# чтобы фронт работал
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,4 +18,4 @@ def root():
 
 @app.get("/api/signals")
 def signals():
-    return get_mock_signals()
+    return get_signals()
