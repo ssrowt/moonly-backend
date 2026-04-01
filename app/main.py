@@ -17,5 +17,5 @@ def root():
     return {"status": "ok"}
 
 @app.get("/api/signals")
-def signals():
-    return get_signals()
+async def signals():
+    return await get_signals()

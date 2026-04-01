@@ -1,10 +1,12 @@
 import time
+import asyncio
 
 CACHE = {
     "data": None,
     "timestamp": 0
 }
 
+# ---------- TEST SIGNALS ----------
 async def generate_signals():
     signals = []
 
@@ -22,15 +24,14 @@ async def generate_signals():
     return signals
 
 
-def get_signals():
-    import asyncio
-
+# ---------- SAFE ASYNC ----------
+async def get_signals():
     now = time.time()
 
     if CACHE["data"] and now - CACHE["timestamp"] < 10:
         return CACHE["data"]
 
-    data = asyncio.run(generate_signals())
+    data = await generate_signals()
 
     CACHE["data"] = data
     CACHE["timestamp"] = now
