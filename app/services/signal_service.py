@@ -1,3 +1,4 @@
+print("REAL VERSION 123")
 import aiohttp
 import asyncio
 import time
