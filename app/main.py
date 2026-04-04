@@ -13,7 +13,7 @@ def root():
 async def signals(plan: str = Query("free")):
     data = await get_signals()
 
-    # 🔥 ЖЁСТКОЕ РАЗДЕЛЕНИЕ
+    # 🔥 ЖЁСТКОЕ РАЗДЕЛЕНИЕ СИГНАЛОВ
 
     if plan == "free":
         result = data[10:15]
@@ -25,19 +25,20 @@ async def signals(plan: str = Query("free")):
         result = data[:20]
 
         for s in result:
-            s["analysis"] = f"""
-Trend: {s['trend']}
-RSI: {s['rsi']}
-Signal: {s['signal']}
-Entry: {s['entry']}
-TP: {s['tp']}
-SL: {s['sl']}
-Winrate: {s['winrate']}%
-"""
+            s["analysis"] = (
+                f"Trend: {s['trend']} | "
+                f"RSI: {s['rsi']} | "
+                f"Signal: {s['signal']} | "
+                f"Entry: {s['entry']} | "
+                f"TP: {s['tp']} | "
+                f"SL: {s['sl']} | "
+                f"Winrate: {s['winrate']}%"
+            )
 
     else:
         result = data[:5]
 
+    # fallback если пусто
     if not result:
         result = data[:5]
 
