@@ -6,7 +6,7 @@ app = FastAPI()
 
 @app.get("/")
 def root():
-    return {"status": "MOONLY MVP LIVE 🚀"}
+    return {"status": "MOONLY MVP 🚀"}
 
 
 @app.get("/signals")
