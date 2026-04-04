@@ -13,22 +13,16 @@ def root():
 async def signals(plan: str = Query("free")):
     data = await get_signals()
 
-    # 🔥 фильтрация
-    strong = [s for s in data if s["score"] >= 80]
-    medium = [s for s in data if 60 <= s["score"] < 80]
-    weak = [s for s in data if s["score"] < 60]
+    # 🔥 ГАРАНТИЯ РАЗНЫХ СИГНАЛОВ
 
-    # 🟢 FREE — слабые сигналы (другие монеты)
     if plan == "free":
-        result = weak[:5]
+        result = data[10:15]  # НЕ топ
 
-    # 🟡 PRO — средние сигналы
     elif plan == "pro":
-        result = medium[:10]
+        result = data[5:15]  # средние
 
-    # 🔴 DELUXE — топ сигналы
     elif plan == "deluxe":
-        result = strong[:20]
+        result = data[:20]  # топ
 
         for s in result:
             s["analysis"] = f"""
@@ -44,7 +38,7 @@ Winrate: {s['winrate']}%
     else:
         result = data[:5]
 
-    # ❗ чтобы не было пусто
+    # ❗ fallback
     if not result:
         result = data[:5]
 
