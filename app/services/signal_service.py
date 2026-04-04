@@ -45,8 +45,7 @@ def get_trend(closes):
 
 
 def detect_impulse(closes):
-    change = (closes[-1] - closes[-5]) / closes[-5]
-    return change
+    return (closes[-1] - closes[-5]) / closes[-5]
 
 
 def detect_fvg(data):
@@ -96,9 +95,7 @@ async def get_signals():
             signal = "HOLD"
             score = 50
 
-            # 🔥 ОСНОВНАЯ ЛОГИКА
-
-            # BUY
+            # BUY логика
             if (
                 rsi < 40
                 and trend == "UP"
@@ -108,7 +105,7 @@ async def get_signals():
                 signal = "BUY"
                 score = 85
 
-            # SELL
+            # SELL логика
             elif (
                 rsi > 60
                 and trend == "DOWN"
@@ -118,7 +115,7 @@ async def get_signals():
                 signal = "SELL"
                 score = 85
 
-            # fallback
+            # fallback сигналы
             elif rsi < 35:
                 signal = "BUY"
                 score = 65
@@ -144,9 +141,9 @@ async def get_signals():
             })
 
         except Exception as e:
-            print("ERR", symbol, e)
+            print("ERR:", symbol, e)
 
-    # ❗ fallback (если API умер)
+    # fallback если API умер
     if not results:
         results = [{
             "symbol": "BTCUSDT",
