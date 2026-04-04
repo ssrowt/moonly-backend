@@ -34,12 +34,12 @@ def calculate_rsi(closes, period=14):
 
 
 def get_trend(closes):
-    sma_short = sum(closes[-20:]) / 20
-    sma_long = sum(closes[-50:]) / 50
+    sma20 = sum(closes[-20:]) / 20
+    sma50 = sum(closes[-50:]) / 50
 
-    if sma_short > sma_long:
+    if sma20 > sma50:
         return "UP"
-    elif sma_short < sma_long:
+    elif sma20 < sma50:
         return "DOWN"
     return "FLAT"
 
@@ -52,19 +52,19 @@ def detect_fvg(data):
     zones = []
 
     for i in range(2, len(data)):
-        low_prev = float(data[i - 2][3])
         high_prev = float(data[i - 2][2])
+        low_prev = float(data[i - 2][3])
 
-        low = float(data[i][3])
         high = float(data[i][2])
+        low = float(data[i][3])
 
         if low > high_prev:
-            zones.append(("bullish", high_prev, low))
+            zones.append("bullish")
 
         if high < low_prev:
-            zones.append(("bearish", high, low_prev))
+            zones.append("bearish")
 
-    return zones
+    return zones[-3:]
 
 
 async def get_signals():
@@ -78,8 +78,7 @@ async def get_signals():
     for symbol in SYMBOLS:
         try:
             url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=100"
-            r = requests.get(url, timeout=5)
-            data = r.json()
+            data = requests.get(url, timeout=5).json()
 
             if not isinstance(data, list) or len(data) < 60:
                 continue
@@ -95,36 +94,25 @@ async def get_signals():
             signal = "HOLD"
             score = 50
 
-            # BUY логика
-            if (
-                rsi < 40
-                and trend == "UP"
-                and impulse > 0.01
-                and any(z[0] == "bullish" for z in fvg[-3:])
-            ):
+            # 🔥 ОСНОВНАЯ ЛОГИКА
+
+            if rsi < 40 and trend == "UP" and impulse > 0.01 and "bullish" in fvg:
                 signal = "BUY"
-                score = 85
+                score = 90
 
-            # SELL логика
-            elif (
-                rsi > 60
-                and trend == "DOWN"
-                and impulse < -0.01
-                and any(z[0] == "bearish" for z in fvg[-3:])
-            ):
+            elif rsi > 60 and trend == "DOWN" and impulse < -0.01 and "bearish" in fvg:
                 signal = "SELL"
-                score = 85
+                score = 90
 
-            # fallback сигналы
             elif rsi < 35:
                 signal = "BUY"
-                score = 65
+                score = 70
 
             elif rsi > 65:
                 signal = "SELL"
-                score = 65
+                score = 70
 
-            winrate = min(90, max(45, score))
+            winrate = max(45, min(92, score))
 
             results.append({
                 "symbol": symbol,
@@ -137,13 +125,13 @@ async def get_signals():
                 "winrate": winrate,
                 "trend": trend,
                 "rsi": round(rsi, 2),
+                "impulse": round(impulse, 4),
                 "is_fresh": True
             })
 
         except Exception as e:
-            print("ERR:", symbol, e)
+            print("ERR", symbol, e)
 
-    # fallback если API умер
     if not results:
         results = [{
             "symbol": "BTCUSDT",
@@ -156,6 +144,7 @@ async def get_signals():
             "winrate": 65,
             "trend": "UP",
             "rsi": 40,
+            "impulse": 0.01,
             "is_fresh": True
         }]
 

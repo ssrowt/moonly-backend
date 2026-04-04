@@ -6,28 +6,30 @@ app = FastAPI()
 
 @app.get("/")
 def root():
-    return {"status": "WORKING REAL SYSTEM"}
+    return {"status": "MOONLY BACKEND LIVE 🚀"}
 
 
 @app.get("/signals")
 async def signals(plan: str = Query("free")):
     data = await get_signals()
 
-    # 🔥 ЖЁСТКОЕ РАЗДЕЛЕНИЕ СИГНАЛОВ
+    # 🔥 РАЗДЕЛЕНИЕ ПО ПОДПИСКАМ
 
     if plan == "free":
-        result = data[10:15]
+        result = data[:5]
 
     elif plan == "pro":
-        result = data[5:15]
+        result = data[:10]
 
     elif plan == "deluxe":
         result = data[:20]
 
+        # AI-анализ только в deluxe
         for s in result:
             s["analysis"] = (
                 f"Trend: {s['trend']} | "
                 f"RSI: {s['rsi']} | "
+                f"Impulse: {round(s['impulse'], 4)} | "
                 f"Signal: {s['signal']} | "
                 f"Entry: {s['entry']} | "
                 f"TP: {s['tp']} | "
@@ -36,10 +38,6 @@ async def signals(plan: str = Query("free")):
             )
 
     else:
-        result = data[:5]
-
-    # fallback если пусто
-    if not result:
         result = data[:5]
 
     return result
