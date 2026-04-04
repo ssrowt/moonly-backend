@@ -12,6 +12,20 @@ SYMBOLS = [
 ]
 
 
+def safe_request(url):
+    try:
+        r = requests.get(url, timeout=5)
+        data = r.json()
+
+        # ❗ если Binance дал ошибку
+        if isinstance(data, dict):
+            return None
+
+        return data
+    except:
+        return None
+
+
 def calculate_rsi(closes, period=14):
     gains, losses = [], []
 
@@ -44,29 +58,6 @@ def get_trend(closes):
     return "FLAT"
 
 
-def detect_impulse(closes):
-    return (closes[-1] - closes[-5]) / closes[-5]
-
-
-def detect_fvg(data):
-    zones = []
-
-    for i in range(2, len(data)):
-        high_prev = float(data[i - 2][2])
-        low_prev = float(data[i - 2][3])
-
-        high = float(data[i][2])
-        low = float(data[i][3])
-
-        if low > high_prev:
-            zones.append("bullish")
-
-        if high < low_prev:
-            zones.append("bearish")
-
-    return zones[-3:]
-
-
 async def get_signals():
     now = time.time()
 
@@ -76,76 +67,52 @@ async def get_signals():
     results = []
 
     for symbol in SYMBOLS:
-        try:
-            url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=100"
-            data = requests.get(url, timeout=5).json()
+        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=100"
+        data = safe_request(url)
 
-            if not isinstance(data, list) or len(data) < 60:
-                continue
+        if not data or len(data) < 60:
+            continue
 
-            closes = [float(x[4]) for x in data]
-            price = closes[-1]
+        closes = [float(x[4]) for x in data]
+        price = closes[-1]
 
-            rsi = calculate_rsi(closes)
-            trend = get_trend(closes)
-            impulse = detect_impulse(closes)
-            fvg = detect_fvg(data)
+        rsi = calculate_rsi(closes)
+        trend = get_trend(closes)
 
+        # 🔥 РЕАЛЬНЫЙ РАЗНООБРАЗНЫЙ СИГНАЛ
+        if rsi < 35 and trend == "UP":
+            signal = "BUY"
+            score = 80
+        elif rsi > 65 and trend == "DOWN":
+            signal = "SELL"
+            score = 80
+        else:
             signal = "HOLD"
-            score = 50
+            score = 55
 
-            # 🔥 ОСНОВНАЯ ЛОГИКА
-
-            if rsi < 40 and trend == "UP" and impulse > 0.01 and "bullish" in fvg:
-                signal = "BUY"
-                score = 90
-
-            elif rsi > 60 and trend == "DOWN" and impulse < -0.01 and "bearish" in fvg:
-                signal = "SELL"
-                score = 90
-
-            elif rsi < 35:
-                signal = "BUY"
-                score = 70
-
-            elif rsi > 65:
-                signal = "SELL"
-                score = 70
-
-            winrate = max(45, min(92, score))
-
-            results.append({
-                "symbol": symbol,
-                "price": round(price, 2),
-                "signal": signal,
-                "entry": round(price, 2),
-                "tp": round(price * (1.03 if signal == "BUY" else 0.97), 2),
-                "sl": round(price * (0.97 if signal == "BUY" else 1.03), 2),
-                "score": score,
-                "winrate": winrate,
-                "trend": trend,
-                "rsi": round(rsi, 2),
-                "impulse": round(impulse, 4),
-                "is_fresh": True
-            })
-
-        except Exception as e:
-            print("ERR", symbol, e)
-
-    if not results:
-        results = [{
-            "symbol": "BTCUSDT",
-            "price": 65000,
-            "signal": "BUY",
-            "entry": 65000,
-            "tp": 67000,
-            "sl": 63000,
-            "score": 70,
-            "winrate": 65,
-            "trend": "UP",
-            "rsi": 40,
-            "impulse": 0.01,
+        results.append({
+            "symbol": symbol,
+            "price": round(price, 2),
+            "signal": signal,
+            "entry": round(price, 2),
+            "tp": round(price * (1.02 if signal == "BUY" else 0.98), 2),
+            "sl": round(price * (0.98 if signal == "BUY" else 1.02), 2),
+            "score": score,
+            "winrate": min(90, max(50, score)),
+            "trend": trend,
+            "rsi": round(rsi, 2),
             "is_fresh": True
+        })
+
+        # ❗ анти бан Binance
+        time.sleep(0.2)
+
+    # ❗ если всё равно пусто
+    if not results:
+        return [{
+            "symbol": "ERROR",
+            "signal": "NO DATA",
+            "score": 0
         }]
 
     results = sorted(results, key=lambda x: x["score"], reverse=True)
