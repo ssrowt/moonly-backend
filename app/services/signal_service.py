@@ -1,93 +1,41 @@
-import requests
-import time
+import random
 
-CACHE = {"data": [], "timestamp": 0}
-CACHE_TTL = 60
-
-SYMBOLS = [
-    "BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT",
-    "ADAUSDT","DOGEUSDT","AVAXUSDT","LINKUSDT","DOTUSDT",
-    "TRXUSDT","LTCUSDT","BCHUSDT","APTUSDT","NEARUSDT",
-    "ARBUSDT","OPUSDT","SUIUSDT","TONUSDT","MATICUSDT"
+COINS = [
+    "BTCUSDT", "ETHUSDT", "SOLUSDT",
+    "XRPUSDT", "ADAUSDT", "DOGEUSDT",
+    "BNBUSDT", "AVAXUSDT", "LINKUSDT"
 ]
 
+def generate_signal(symbol):
+    price = round(random.uniform(50, 70000), 2)
 
-def get_price(symbol):
-    try:
-        url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-        r = requests.get(url, timeout=3)
-        data = r.json()
+    direction = random.choice(["LONG", "SHORT"])
 
-        if "price" in data:
-            return float(data["price"])
-    except:
-        pass
+    if direction == "LONG":
+        entry = price
+        tp = round(price * 1.02, 2)
+        sl = round(price * 0.98, 2)
+    else:
+        entry = price
+        tp = round(price * 0.98, 2)
+        sl = round(price * 1.02, 2)
 
-    return None
+    return {
+        "symbol": symbol,
+        "signal": direction,
+        "entry": entry,
+        "tp": tp,
+        "sl": sl,
+        "trend": random.choice(["UP", "DOWN"]),
+        "rsi": random.randint(30, 70),
+        "winrate": random.randint(55, 70)
+    }
 
 
 async def get_signals():
-    now = time.time()
+    signals = []
 
-    if now - CACHE["timestamp"] < CACHE_TTL and CACHE["data"]:
-        return CACHE["data"]
+    for coin in COINS:
+        signals.append(generate_signal(coin))
 
-    results = []
-
-    for i, symbol in enumerate(SYMBOLS):
-        price = get_price(symbol)
-
-        if not price:
-            continue
-
-        # 🔥 мягкая логика сигналов
-        if i % 3 == 0:
-            signal = "BUY"
-            score = 75
-        elif i % 3 == 1:
-            signal = "SELL"
-            score = 75
-        else:
-            signal = "HOLD"
-            score = 60
-
-        results.append({
-            "symbol": symbol,
-            "price": round(price, 2),
-            "signal": signal,
-            "entry": round(price, 2),
-            "tp": round(price * (1.02 if signal == "BUY" else 0.98), 2),
-            "sl": round(price * (0.98 if signal == "BUY" else 1.02), 2),
-            "score": score,
-            "winrate": score,
-            "trend": "UP" if signal == "BUY" else "DOWN",
-            "rsi": 50,
-            "is_fresh": True
-        })
-
-        time.sleep(0.1)
-
-    # ❗ если Binance опять отвалился → не даем пустоту
-    if len(results) < 5:
-        results = []
-        for i, symbol in enumerate(SYMBOLS):
-            base_price = 100 + i * 10
-
-            results.append({
-                "symbol": symbol,
-                "price": base_price,
-                "signal": "BUY" if i % 2 == 0 else "SELL",
-                "entry": base_price,
-                "tp": base_price * 1.02,
-                "sl": base_price * 0.98,
-                "score": 70,
-                "winrate": 65,
-                "trend": "UP",
-                "rsi": 50,
-                "is_fresh": True
-            })
-
-    CACHE["data"] = results
-    CACHE["timestamp"] = now
-
-    return results
+    return signals
