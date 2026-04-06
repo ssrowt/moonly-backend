@@ -172,7 +172,7 @@ async def get_signals():
 # ===== API =====
 @app.get("/")
 def root():
-    return {"status": "MOONLY FINAL LIVE"}
+    return {"status": "MOONLY FINAL 123"}
 
 
 @app.get("/signals")
