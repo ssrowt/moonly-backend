@@ -17,6 +17,7 @@ SYMBOLS = [
     "ARBUSDT","OPUSDT","SUIUSDT","TONUSDT","MATICUSDT"
 ]
 
+
 def calculate_rsi(closes, period=14):
     gains, losses = [], []
     for i in range(1, len(closes)):
@@ -36,17 +37,21 @@ def calculate_rsi(closes, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
+
 def get_trend(closes):
     sma20 = sum(closes[-20:]) / 20
     sma50 = sum(closes[-50:]) / 50
+
     if sma20 > sma50:
         return "UP"
     elif sma20 < sma50:
         return "DOWN"
     return "FLAT"
 
+
 def detect_impulse(closes):
     return (closes[-1] - closes[-5]) / closes[-5]
+
 
 def detect_fvg_zone(data):
     for i in range(len(data)-3, 2, -1):
@@ -63,12 +68,14 @@ def detect_fvg_zone(data):
 
     return None
 
+
 def is_strong_signal(rsi, impulse):
     if impulse < 0.003:
         return False
     if 45 < rsi < 55:
         return False
     return True
+
 
 def calculate_levels(data, signal, fvg_zone):
     highs = [float(x[2]) for x in data[-20:]]
@@ -83,16 +90,10 @@ def calculate_levels(data, signal, fvg_zone):
     zone_type, zone_low, zone_high = fvg_zone
 
     if signal == "BUY" and zone_type == "bullish":
-        entry = zone_low
-        sl = recent_low
-        tp = recent_high
-        return round(entry,2), round(tp,2), round(sl,2)
+        return round(zone_low,2), round(recent_high,2), round(recent_low,2)
 
     if signal == "SELL" and zone_type == "bearish":
-        entry = zone_high
-        sl = recent_high
-        tp = recent_low
-        return round(entry,2), round(tp,2), round(sl,2)
+        return round(zone_high,2), round(recent_low,2), round(recent_high,2)
 
     return None, None, None
 
@@ -114,6 +115,7 @@ async def get_signals():
         return CACHE["data"]
 
     results = []
+    fallback = []
 
     for symbol in SYMBOLS:
         try:
@@ -132,6 +134,24 @@ async def get_signals():
             impulse = detect_impulse(closes)
             fvg_zone = detect_fvg_zone(data)
 
+            # fallback сигнал (ВСЕГДА)
+            basic_signal = "BUY" if rsi < 50 else "SELL"
+
+            fallback.append({
+                "symbol": symbol,
+                "price": round(price, 2),
+                "signal": basic_signal,
+                "entry": round(price,2),
+                "tp": round(price * (1.02 if basic_signal == "BUY" else 0.98),2),
+                "sl": round(price * (0.98 if basic_signal == "BUY" else 1.02),2),
+                "score": 50,
+                "winrate": 50,
+                "trend": trend,
+                "rsi": round(rsi, 2),
+                "is_fresh": True
+            })
+
+            # сильные сигналы
             if not is_strong_signal(rsi, impulse):
                 continue
 
@@ -153,7 +173,6 @@ async def get_signals():
 
             score = int(abs(impulse) * 1000)
             score = max(60, min(90, score))
-
             winrate = min(90, max(50, score - 5))
 
             signal_data = {
@@ -176,6 +195,10 @@ async def get_signals():
         except Exception as e:
             print("ERR", symbol, e)
 
+    # если нет сильных → fallback
+    if not results:
+        results = fallback
+
     results = sorted(results, key=lambda x: x["score"], reverse=True)
 
     CACHE["data"] = results
@@ -186,7 +209,7 @@ async def get_signals():
 
 @app.get("/")
 def root():
-    return {"status": "MOONLY FULL SYSTEM LIVE"}
+    return {"status": "MOONLY FINAL LIVE"}
 
 
 @app.get("/signals")
